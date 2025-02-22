@@ -96,7 +96,7 @@ Inside your go-app directory, create a new file named Dockerfile:
 Copy and paste the following into Dockerfile:
     ```docker
     # Use the official Golang image as a builder
-    FROM golang:1.21 AS builder
+    FROM golang:1.23.4 AS builder
     # Set the working directory inside the container
     WORKDIR /app
     # Copy the Go module files and download dependencies

@@ -83,3 +83,94 @@ When you run this Go application, it starts an HTTP server on port 8080. Any HTT
     go run main.go
     ```
 Then, open the preview URL in Codespaces to see your app in action.
+
+### Step 2: Containerizing the Go App with Docker
+Before deploying to K3s, we need to containerize the app.
+1. Create a Dockerfile
+Inside your go-app directory, create a new file named Dockerfile:
+    ```bash
+        touch Dockerfile
+        code Dockerfile
+    ```
+2. Write the Dockerfile
+Copy and paste the following into Dockerfile:
+    ```docker
+    # Use the official Golang image as a builder
+    FROM golang:1.21 AS builder
+    # Set the working directory inside the container
+    WORKDIR /app
+    # Copy the Go module files and download dependencies
+    COPY go.mod go.sum ./
+    RUN go mod download
+    # Copy the rest of the application code
+    COPY . .
+    # Build the Go application
+    RUN go build -o go-app
+    # Use a smaller base image for the final container
+    FROM debian:bookworm-slim
+    # Set the working directory in the new container
+    WORKDIR /app
+    # Copy the compiled binary from the builder
+    COPY --from=builder /app/go-app .
+    # Expose the port the app runs on
+    EXPOSE 8080
+    # Run the application
+    CMD ["./go-app"]
+    ```
+
+    In the provided Dockerfile, the WORKDIR /app command sets the working directory inside the container to /app. This means that any subsequent COPY, RUN, or other commands will be executed relative to this directory.
+
+#### Breakdown:
+* Set the Working Directory: `WORKDIR /app`
+    
+    This command sets the working directory inside the container to /app. If the directory does not exist, it will be created.
+
+* Copy Go Module Files: `COPY go.mod go.sum ./`
+
+    This command copies the go.mod and go.sum files from your local machine (the build context) to the /app directory inside the container. The gh-terra-goapp at the end of the command specifies the current working directory inside the container, which is /app due to the previous WORKDIR command.
+
+* Download Dependencies: `RUN go mod download`
+
+    This command runs go mod download inside the container, which downloads the dependencies specified in the go.mod file to the module cache inside the container.
+
+* Copy the Rest of the Application Code: `COPY . .`
+
+This command copies all the remaining files and directories from your local machine (the build context) to the /app directory inside the container. The first . refers to the current directory on your local machine, and the second . refers to the current working directory inside the container (/app).
+
+Local Files:
+go.mod and go.sum: These files should be located in the root directory of your Go project on your local machine. When you run the docker build command, the current directory (where the Dockerfile is located) is used as the build context, and these files are copied from there into the container.
+Example Directory Structure:
+```
+/workspaces/gh-terra-goapp
+├── Dockerfile
+├── go.mod
+├── go.sum
+├── main.go
+└── other_files_and_directories
+```
+Assuming your project directory on your local machine looks like this:
+
+When you run the `docker build` command, the `go.mod` and `go.sum` files will be copied from gh-terra-goapp on your local machine to `/app` inside the container.
+
+Summary:
+The `WORKDIR /app` command sets the working directory inside the container to `/app`.
+The `COPY go.mod go.sum ./` command copies the go.mod and go.sum files from your local machine to the /app directory inside the container.
+The `COPY . .` command copies the rest of the application code from your local machine to the /app directory inside the container.
+This setup ensures that the Go module files and the rest of your application code are available in the /app directory inside the container, allowing the build process to proceed correctly.
+
+### Step 3: Build and Run the Docker Container
+1. Build the Docker image:
+    `docker build -t go-app .`
+    
+    If this throws error that there is no file as `go.sum`, ensure that the external package is added: 
+    `go get github.com/gorilla/mux`
+    `go mod tidy`
+
+    then rebuild the app.
+
+2. Run the container:
+`docker run -p 8080:8080 go-app`
+
+3. Access the app:
+• Like before, forward port 8080 in Codespaces.
+• Open the browser and verify that the app still displays “Hello, K3s!”.

@@ -159,6 +159,7 @@ The `COPY . .` command copies the rest of the application code from your local m
 This setup ensures that the Go module files and the rest of your application code are available in the /app directory inside the container, allowing the build process to proceed correctly.
 
 ### Step 3: Build and Run the Docker Container
+
 1. Build the Docker image:
     `docker build -t go-app .`
     
@@ -174,3 +175,75 @@ This setup ensures that the Go module files and the rest of your application cod
 3. Access the app:
 • Like before, forward port 8080 in Codespaces.
 • Open the browser and verify that the app still displays “Hello, K3s!”.
+
+### Step 4: Setting Up K3s in GitHub Codespaces
+Since we are using GitHub Codespaces, we will install K3s (a lightweight Kubernetes distribution) and deploy our app there.
+1. Install K3s in Codespaces
+Run the following command inside your Codespace terminal:
+    ```
+    curl -sfL https://get.k3s.io | sh -
+    ```
+    Once installed, check if K3s is running:
+    ```
+    kubectl get nodes
+    ```
+    You should see an output similar to this:
+    ![alt text](assets/dockerps.png)
+
+    Since GitHub Codespaces runs inside a containerized environment, we need to disable systemd and start K3s manually. Here’s how:
+    #### 1. Run K3s Without Systemd
+    Execute the following command:
+    
+        ```
+        docker run --privileged -d --name k3s \
+        -e K3S_KUBECONFIG_MODE="644" \
+        -p 6443:6443 -p 80:80 -p 443:443 \
+        rancher/k3s:v1.31.5-k3s1 server --disable traefik
+        ```
+    What This Does:
+    • --privileged: Grants permissions for K3s to manage networking.
+    • -d: Runs K3s in detached mode.
+    • -p 6443:6443: Exposes the K3s API server.
+    • -e K3S_KUBECONFIG_MODE="644": Allows non-root users to access K3s config.
+    • --disable traefik: Disables the built-in Traefik Ingress controller (we’ll manage it later).
+    #### 2. Verify K3s is Running
+    Check if the container is running:
+
+        `docker ps`
+
+    You should see an entry like:
+    ![alt text](assets/dockerps.png)
+
+    #### 3. Get the Kubernetes Configuration
+    To interact with the cluster, get the K3s kubeconfig file:
+    `docker exec -it k3s cat /etc/rancher/k3s/k3s.yaml`
+    
+    You’ll see something like this:
+    
+    ```yml
+    apiVersion: v1
+    clusters:
+    - cluster:
+    certificate-authority-data: XYZ...
+    server: https://127.0.0.1:6443
+    name: default
+    contexts:
+    - context:
+    cluster: default
+    user: default
+    name: default
+    current-context: default
+    kind: Config
+    ```
+
+    Copy this output into a file named k3s.yaml in your Codespace.
+
+    #### 4. Set Up Kubeconfig to Use K3s
+    Now, point kubectl to use this configuration:
+    `export KUBECONFIG=./k3s.yaml`
+    
+    Test if kubectl can access K3s:
+    `kubectl get nodes`
+
+    Expected output:
+    ![alt text](<assets/kubectl get nodes.png>)
